@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Smart Greenhouse Monitor</title>
+
+  <!-- Firebase -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+
+  <!-- Chart -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <!-- Gauge -->
+  <script src="https://cdn.jsdelivr.net/npm/raphael"></script>
+  <script src="https://cdn.jsdelivr.net/npm/justgage"></script>
+
+  <!-- Font -->
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;500;700&display=swap" rel="stylesheet">
+
+  <style>
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      font-family: 'Poppins', sans-serif;
+      background: linear-gradient(135deg,#1abc9c,#3498db);
+      min-height: 100vh;
+      color: #2c3e50;
+      text-align: center;
+    }
+
+    h1 {
+      color: #fff;
+      margin: 25px 0;
+      letter-spacing: 2px;
+    }
+
+    /* ===== GRID ATAS ===== */
+    .container {
+      display: grid;
+      grid-template-columns: repeat(auto-fit,minmax(320px,1fr));
+      gap: 25px;
+      padding: 20px;
+      max-width: 1200px;
+      margin: auto;
+    }
+
+    .card {
+      background: rgba(255,255,255,.25);
+      backdrop-filter: blur(12px);
+      border-radius: 22px;
+      padding: 20px;
+      box-shadow: 0 15px 35px rgba(0,0,0,.25);
+      animation: fadeIn 1s ease;
+    }
+
+    @keyframes fadeIn {
+      from { opacity:0; transform: translateY(30px);}
+      to { opacity:1; transform: translateY(0);}
+    }
+
+    canvas { width:100%!important; }
+
+    /* ===== POMPA CENTER ===== */
+    .pump-wrapper {
+      display: flex;
+      justify-content: center;
+      margin: 40px 0;
+    }
+
+    .pump-card {
+      width: 360px;
+      background: rgba(255,255,255,.28);
+      backdrop-filter: blur(15px);
+      padding: 25px;
+      border-radius: 24px;
+      box-shadow: 0 20px 45px rgba(0,0,0,.35);
+      animation: float 3s ease-in-out infinite;
+    }
+
+    @keyframes float {
+      0% { transform: translateY(0); }
+      50% { transform: translateY(-6px); }
+      100% { transform: translateY(0); }
+    }
+
+    /* ===== SWITCH ===== */
+    .switch-box {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      gap: 15px;
+      margin: 15px 0;
+      font-weight: bold;
+    }
+
+    .switch {
+      position: relative;
+      width: 70px;
+      height: 36px;
+    }
+
+    .switch input { display:none; }
+
+    .slider {
+      position: absolute;
+      inset: 0;
+      background: #ddd;
+      border-radius: 40px;
+      cursor: pointer;
+      transition: .4s;
+    }
+
+    .slider:before {
+      content: "";
+      position: absolute;
+      height: 28px;
+      width: 28px;
+      left: 4px;
+      top: 4px;
+      background: #fff;
+      border-radius: 50%;
+      transition: .4s;
+      box-shadow: 0 4px 12px rgba(0,0,0,.4);
+    }
+
+    input:checked + .slider {
+      background: linear-gradient(135deg,#2ecc71,#27ae60);
+      box-shadow: 0 0 18px rgba(46,204,113,.9);
+    }
+
+    input:checked + .slider:before {
+      transform: translateX(34px);
+    }
+
+    /* ===== STATUS ===== */
+    .pump-status {
+      margin-top: 10px;
+      padding: 10px;
+      border-radius: 14px;
+      font-weight: bold;
+    }
+
+    .on {
+      background:#2ecc71;
+      color:#fff;
+      box-shadow:0 0 20px rgba(46,204,113,.8);
+      animation:pulse 1.2s infinite;
+    }
+
+    .off {
+      background:#e74c3c;
+      color:#fff;
+      box-shadow:0 0 20px rgba(231,76,60,.8);
+    }
+
+    @keyframes pulse {
+      0% { transform: scale(1); }
+      50% { transform: scale(1.08); }
+      100% { transform: scale(1); }
+    }
+
+    .value-label {
+    margin-top: 12px;
+    font-size: 26px;
+    font-weight: 700;
+    color: #ffffff;
+    text-shadow: 0 4px 12px rgba(0,0,0,0.4);
+    }
+
+    /* ================== RESPONSIVE MOBILE ================== */
+@media (max-width: 768px) {
+
+  h1 {
+    font-size: 22px;
+    margin: 20px 0;
+  }
+
+  .container {
+    grid-template-columns: 1fr; /* 1 kolom di HP */
+    padding: 15px;
+    gap: 20px;
+  }
+
+  .card {
+    padding: 16px;
+    border-radius: 18px;
+  }
+
+  canvas {
+    height: 220px !important;
+  }
+
+  .value-label {
+    font-size: 22px;
+    margin-top: 10px;
+  }
+
+  .pump-wrapper {
+    margin: 25px 0;
+  }
+
+  .pump-card {
+    width: 90%;
+    padding: 20px;
+    border-radius: 20px;
+  }
+
+  .switch {
+    width: 64px;
+    height: 34px;
+  }
+
+  .slider:before {
+    width: 26px;
+    height: 26px;
+  }
+
+  input:checked + .slider:before {
+    transform: translateX(30px);
+  }
+}
+
+/* ================== EXTRA SMALL (HP KECIL) ================== */
+@media (max-width: 480px) {
+
+  h1 {
+    font-size: 20px;
+  }
+
+  .value-label {
+    font-size: 20px;
+  }
+
+  canvas {
+    height: 200px !important;
+  }
+}
+
+
+  </style>
+</head>
+
+<body>
+
+<h1>🌱 SMART GREENHOUSE</h1>
+
+<!-- ===== DASHBOARD ===== -->
+<div class="container">
+  <div class="card">
+    <h3>🌡️ Suhu</h3>
+    <canvas id="chartSuhu"></canvas>
+
+    <!-- LABEL BAWAH -->
+    <div class="value-label" id="labelSuhu">
+      -- °C
+    </div>
+  </div>
+
+
+  <div class="card">
+    <h3>💧 Humidity</h3>
+    <canvas id="chartHum"></canvas>
+
+    <!-- LABEL BAWAH -->
+    <div class="value-label" id="labelHum">
+      -- %
+    </div>
+  </div>
+
+  <div class="card">
+    <h3>🌱 Kelembapan Tanah</h3>
+    <div id="soilGauge" style="width:100%;height:220px;"></div>
+  </div>
+</div>
+
+<!-- ===== KONTROL POMPA (CENTER) ===== -->
+<div class="pump-wrapper">
+  <div class="pump-card">
+    <h3>🚿 Kontrol Pompa</h3>
+
+    <div class="switch-box">
+      OFF
+      <label class="switch">
+        <input type="checkbox" id="autoPump">
+        <span class="slider"></span>
+      </label>
+      ON
+    </div>
+
+    <div id="pumpStatus" class="pump-status off">-</div>
+  </div>
+</div>
+
+<script>
+/* ================= FIREBASE ================= */
+firebase.initializeApp({
+  apiKey: "AIzaSyCf89wacMV-TctFd0ruoMmFNyyiWVYQVB0",
+  databaseURL: "https://iot-suhu-142f6-default-rtdb.asia-southeast1.firebasedatabase.app"
+});
+const db = firebase.database();
+
+/* ================= CHART ================= */
+function makeChart(ctx, label, color) {
+  return new Chart(ctx, {
+    type: "line",
+    data: {
+      labels: [],
+      datasets: [{
+        label: label,
+        data: [],
+        borderColor: color,
+        borderWidth: 2,
+        tension: 0.4
+      }]
+    },
+    options: {
+      responsive: true,
+      animation: true,
+      scales: {
+        y: { beginAtZero: false }
+      }
+    }
+  });
+}
+
+const chartSuhu = makeChart(
+  document.getElementById("chartSuhu"),
+  "Suhu (°C)",
+  "#e67e22"
+);
+
+const chartHum = makeChart(
+  document.getElementById("chartHum"),
+  "Humidity (%)",
+  "#3498db"
+);
+
+/* ================= GAUGE ================= */
+const soilGauge = new JustGage({
+  id: "soilGauge",
+  value: 0,
+  min: 0,
+  max: 4095,
+  label: "ADC",
+  labelFontColor: "#ffffff",
+  valueFontColor: "#ffffff",
+  minMaxFontColor: "#ffffff",
+  levelColors: ["#2ecc71", "#f1c40f", "#e74c3c"]
+});
+
+/* ================= LISTENER SENSOR ================= */
+db.ref("iotgreenhouse").on("value", snap => {
+  const d = snap.val();
+  if (!d) return;
+
+  const time = new Date().toLocaleTimeString();
+
+  function update(chart, value) {
+    if (chart.data.labels.length > 20) {
+      chart.data.labels.shift();
+      chart.data.datasets[0].data.shift();
+    }
+    chart.data.labels.push(time);
+    chart.data.datasets[0].data.push(value);
+    chart.update();
+  }
+  update(chartSuhu, d.suhu);
+  update(chartHum, d.humidity);
+
+  document.getElementById("labelSuhu").innerHTML =
+    d.suhu.toFixed(1) + " °C";
+
+  document.getElementById("labelHum").innerHTML =
+    d.humidity.toFixed(1) + " %";
+
+  soilGauge.refresh(d.soil);
+
+  const ps = document.getElementById("pumpStatus");
+  ps.textContent = d.pompaStatus ? "POMPA ON 🚿" : "POMPA OFF ⛔";
+  ps.className = "pump-status " + (d.pompaStatus ? "on" : "off");
+});
+
+/* ================= SWITCH AUTO PUMP ================= */
+const autoPump = document.getElementById("autoPump");
+
+db.ref("iotgreenhouse/autoPump").on("value", snap => {
+  autoPump.checked = !!snap.val();
+});
+
+autoPump.addEventListener("change", () => {
+  db.ref("iotgreenhouse/autoPump").set(autoPump.checked);
+});
+</script>
+
+
+</body>
+</html>
